@@ -1,0 +1,5 @@
+customer_uuid,booking_type,booking_code,booking_amount
+c1,online,bc1,100
+c2,online,bc1,150
+c3,counter,bc2,200
+c4,counter,bc3,400
