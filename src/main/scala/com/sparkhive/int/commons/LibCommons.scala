@@ -5,7 +5,6 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession,AnalysisException
 
 object LibCommons extends LocalConf{
 
-
   def joinTables(leftTable:DataFrame,rightTable:DataFrame,columnNames:Seq[String],joinType:String):DataFrame=
   {
     try
@@ -16,12 +15,13 @@ object LibCommons extends LocalConf{
         }
         else
         {
-          throw new JoinTypeNotFound("Join Type ["+joinType+"] not found.")
+          throw JoinTypeNotFound("Join type ["+joinType+"] not found.")
         }
       }
     catch
       {
         case joinTypeNotFound: JoinTypeNotFound=>throw joinTypeNotFound
+        case analysisException: AnalysisException=>throw analysisException
         case exception: Exception=>throw exception
       }
 
@@ -46,7 +46,6 @@ object LibCommons extends LocalConf{
 
     }
 
-  @throws[Exception]
   def storeDataFrameToHiveTable(df:DataFrame,hiveTableName:String):Boolean=
   {
     df.write.mode(SaveMode.Overwrite).saveAsTable(hiveTableName.trim)
