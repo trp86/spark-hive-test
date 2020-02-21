@@ -4,7 +4,6 @@ import com.holdenkarau.spark.testing.{DataFrameSuiteBase, DatasetSuiteBase}
 import com.sparkhive.int.commons.{HiveTableNotFound, JoinTypeNotFound, LibCommons}
 import org.apache.spark.sql.{AnalysisException, DataFrame, SparkSession}
 import org.apache.spark.sql.internal.StaticSQLConf.CATALOG_IMPLEMENTATION
-import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructType}
 import org.scalatest.{BeforeAndAfterEach, FunSpec}
 
 class SparkHiveIntTest extends
@@ -20,53 +19,32 @@ class SparkHiveIntTest extends
   override def sparkSession: SparkSession = spark
 
   override def beforeEach() {
-
     //DROP IF EXISTS
     sparkSession.sql("DROP TABLE IF EXISTS cust_details.customer")
     sparkSession.sql("DROP TABLE IF EXISTS cust_details.customer_booking")
-    sparkSession.sql("DROP DATABASE IF EXISTS cust_details")
+    sparkSession.sql("DROP TABLE IF EXISTS cust_details.customer_booking_info")
 
     //Create Customer database
     sparkSession.sql("DROP DATABASE IF EXISTS cust_details")
     sparkSession.sql("CREATE DATABASE IF NOT EXISTS cust_details LOCATION '/tmp/cust_details.db'")
 
     //Create customer table
-
-    //Schema
-   /* val customerSchema=StructType(Array(
-      StructField("customer_uuid",StringType,nullable = false),
-      StructField("email_hash",StringType,nullable = false),
-      StructField("customer_type",StringType,nullable = false),
-      StructField("preferred_lan_code",StringType,nullable = false)
-    ))*/
-
     //Dataframe
     SparkHiveIntTest.df_customer=sparkSession.read/*.schema(customerSchema)*/.option("header","true").option("inferSchema","true").csv(resourcePath+"customer.csv")
-    //Saving the datarame
+    //Saving the dataframe
     SparkHiveIntTest.df_customer.write.saveAsTable("cust_details.customer")
 
 
     //Create the customer_booking
-
-    //Schema
-   /* val customerBookingSchema=StructType(Array(
-      StructField("customer_uuid",StringType,nullable = false),
-      StructField("booking_type",StringType,nullable = false),
-      StructField("booking_code",StringType,nullable = false),
-      StructField("booking_amount",DoubleType,nullable = false)
-    ))*/
-
     //Dataframe
     SparkHiveIntTest.df_customerBooking=sparkSession.read.option("header","true").option("inferSchema","true").csv(resourcePath+"customer_booking.csv")
-    //Saving the datarame
+    //Saving the dataframe
     SparkHiveIntTest.df_customerBooking.write.saveAsTable("cust_details.customer_booking")
 
-
     //Create the customer_booking_info
-    SparkHiveIntTest.df_customer_booking_info=sparkSession.read.option("header","true").option("inferSchema","true").csv(resourcePath+"customer_booking_info.csv")
-
-
-
+     SparkHiveIntTest.df_customer_booking_info=sparkSession.read.option("header","true").option("inferSchema","true").csv(resourcePath+"customer_booking_info.csv")
+    //Saving the dataframe
+     SparkHiveIntTest.df_customer_booking_info.write.saveAsTable("cust_details.customer_booking_info")
   }
 
   //LibCommons.createDataFrameFromHiveTable
@@ -135,7 +113,7 @@ class SparkHiveIntTest extends
     it("should generate exception when join type is other than [inner]") {
       val exception=intercept[JoinTypeNotFound]
         {
-          val join_df=LibCommons.joinTables(SparkHiveIntTest.df_customer,
+          LibCommons.joinTables(SparkHiveIntTest.df_customer,
             SparkHiveIntTest.df_customerBooking,
             Seq("customer_uuid"),
             "1inner")
@@ -145,13 +123,65 @@ class SparkHiveIntTest extends
 
   }
 
+  //LibCommons.storeDataFrameToHiveTable
+  describe("Test-storeDataFrameToHiveTable")
+  {
+    it("should store a dataframe and return true to a hive table if exists")
+    {
+      val status=LibCommons.storeDataFrameToHiveTable(
+        SparkHiveIntTest.df_customer_booking_info,
+        "cust_details.customer_booking_info")
+
+      //Should return true
+      assert(status==true)
+
+      //Check if stored dataframe is same as that of initial dataframe
+      val df: DataFrame = LibCommons.createDataFrameFromHiveTable("cust_details.customer_booking_info")
+      val columns = df.columns
+      assertDataFrameEquals(SparkHiveIntTest.df_customer_booking_info.select(columns.head,columns.tail:_*),
+        df.select(columns.head,columns.tail:_*))
+    }
+
+    it("should store a dataframe and overwrite the existing table")
+    {
+      //Store the dataframe (First Time)
+      LibCommons.storeDataFrameToHiveTable(
+        SparkHiveIntTest.df_customer_booking_info,
+        "cust_details.customer_booking_info")
+
+      //Store the dataframe (Second Time)
+      LibCommons.storeDataFrameToHiveTable(
+        SparkHiveIntTest.df_customer_booking_info,
+        "cust_details.customer_booking_info")
+
+      //Check if dataframe record count==4
+      assert(spark.sql("select * from cust_details.customer_booking_info").count() == 4)
+
+      //Check if stored dataframe is same as that of initial dataframe
+      val df: DataFrame = LibCommons.createDataFrameFromHiveTable("cust_details.customer_booking_info")
+      val columns = df.columns
+      assertDataFrameEquals(SparkHiveIntTest.df_customer_booking_info.select(columns.head,columns.tail:_*),
+        df.select(columns.head,columns.tail:_*))
+    }
+
+    it("should generate exception if target hive table is not present")
+    {
+    intercept[AnalysisException]
+      {
+        LibCommons.storeDataFrameToHiveTable(
+          SparkHiveIntTest.df_customer_booking_info,
+          "test")
+      }
+    }
+  }
+
   override def afterAll() {
     super.afterAll()
-
     //Drop tables
-    spark.sql("DROP TABLE IF EXISTS cust_details.customer")
-    spark.sql("DROP TABLE IF EXISTS cust_details.customer_booking")
-    spark.sql("DROP DATABASE IF EXISTS cust_details")
+   sparkSession.sql("DROP TABLE IF EXISTS cust_details.customer")
+    sparkSession.sql("DROP TABLE IF EXISTS cust_details.customer_booking")
+    sparkSession.sql("DROP TABLE IF EXISTS cust_details.customer_booking_info")
+    sparkSession.sql("DROP DATABASE IF EXISTS cust_details")
   }
 
 

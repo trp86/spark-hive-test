@@ -1,7 +1,8 @@
 package com.sparkhive.int.commons
 
 import com.sparkhive.int.LocalConf
-import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession,AnalysisException}
+import org.apache.hadoop.hive.metastore.api.InvalidOperationException
+import org.apache.spark.sql.{AnalysisException, DataFrame, SaveMode, SparkSession}
 
 object LibCommons extends LocalConf{
 
@@ -48,8 +49,20 @@ object LibCommons extends LocalConf{
 
   def storeDataFrameToHiveTable(df:DataFrame,hiveTableName:String):Boolean=
   {
-    df.write.mode(SaveMode.Overwrite).saveAsTable(hiveTableName.trim)
-    true
+    try
+      {
+        if (hiveTableName eq null) throw new HiveTableNotFound("Hive table name cannot be null.")
+        if (hiveTableName.trim.length<=0) throw new HiveTableNotFound("Hive table name length <= 0.")
+        df.write.mode(SaveMode.Overwrite).saveAsTable(hiveTableName.trim)
+        true
+      }
+    catch
+      {
+        case hiveTableNotFound:HiveTableNotFound=>throw hiveTableNotFound
+        case analysisException:AnalysisException=>throw analysisException
+        case e:Exception=>throw e
+      }
+
   }
 
 

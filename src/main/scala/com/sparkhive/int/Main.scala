@@ -1,12 +1,9 @@
 package com.sparkhive.int
 
 import com.sparkhive.int.commons.LibCommons
-import org.apache.spark.sql.SparkSession
+
 
 object Main extends LocalConf {
-
-
-
   def main(args: Array[String]): Unit = {
 
     //Create dataframes for hive tables
